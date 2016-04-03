@@ -1,0 +1,80 @@
+---
+title: "Practical Machine Learning Course Project"
+output: html_document
+---
+
+#Summary
+The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.These participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. For more info refer to http://groupware.les.inf.puc-rio.br/har website in the section of Weight Lifting Exercise Dataset.
+Jawbone Up, Nike FuelBand, and Fitbit devices can be used to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+#Load Data and identify "NA", infinity, and others
+```{r}
+set.seed(555)
+train_dp <- read.csv("pml-training.csv", na.strings = c("NA","","#DIV/0!"))
+test_dp <- read.csv("pml-testing.csv", na.strings = c("NA","","#DIV/0!"))
+```
+
+##Clean Data by removing NA and certain columns from training and test set
+```{r}
+train_nacount = sapply(1: dim(train_dp)[2], function(x) sum(is.na(train_dp[, x])))
+train_list_na = which(train_nacount>0)
+train_dp = train_dp[,-train_list_na]
+train_dp = train_dp[,-c(1:7)]
+
+test_nacount = sapply(1: dim(test_dp)[2], function(y) sum(is.na(test_dp[, y])))
+test_list_na = which(test_nacount>0)
+test_dp = test_dp[,-train_list_na]
+test_dp = test_dp[,-c(1:7)]
+
+dim(train_dp)
+dim(test_dp)
+```
+##Load the required packages, libraries,and create data partition from the above test and train data set
+```{r}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(rattle)
+library(randomForest)
+inTrain = createDataPartition(y=factor(train_dp$classe), p=0.6, list=FALSE)
+training <- train_dp[inTrain,]
+testing <- train_dp[-inTrain,]
+```                      
+##Fit model and create prediction using Tree method
+```{r, echo=TRUE}
+modfit_1 <- train(classe~ ., method='rpart', data=training)
+fancyRpartPlot(modfit_1$finalModel)
+pred_1 =predict(modfit_1, newdata=testing)
+cfm_1 <- confusionMatrix(pred_1, testing$classe)
+cfm_1$table
+cfm_1$overall[1]
+```
+For the above Tree method, by looking at the confusion matrix, accuracy is 0.4963 which indicates that this model can be rejected.
+
+##Fit model and create prediction using Random forest
+```{r}
+modfit_2 <- randomForest(classe~.,data=training,method='class')
+pred_2 = predict(modfit_2, newdata=testing, type='class')
+cfm_2 <- confusionMatrix(pred_2, testing$classe)
+cfm_2$table
+cfm_2$overall[1]
+```
+##Plots using qplot
+```{r, echo=TRUE}
+qplot(gyros_belt_x,gyros_belt_y,colour=classe,data=training)
+qplot(accel_arm_x,accel_arm_z,colour=classe,data=training)
+qplot(roll_belt, magnet_dumbbell_y, colour=classe, data=training)
+```
+
+For the above RandomForest method, by looking at the confusion matrix, accuracy is 0.9926. Hence this model can be used for prediction of testing the data set.
+```{r}
+pred_3 =  predict(modfit_2,test_dp,type='class')
+    nofiles = length(pred_3)
+    for (i in 1:nofiles){
+        filename =  paste0("problem_id",i,".txt")
+        write.table(pred_3[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+    pred_3
+```
+#Conclusion
+From the above, it's clear that RandomForest is the best method to fit the model and for prediction of test data set.
